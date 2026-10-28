@@ -59,7 +59,12 @@
   .ctl-foot{display:flex; align-items:center; justify-content:space-between; gap:var(--s3); margin-top:var(--s3)}
   .ctl-foot + .ctl-foot{margin-top:var(--s2)}
 
-  #metrics{top:var(--s5); right:var(--s5); width:308px; padding:var(--s4)}
+  /* One right-hand rail, stacked: the readout sizes to its content and the legend
+     takes what is left and scrolls. Two independently anchored panels collided as
+     soon as the readout grew a row. */
+  .rail{position:fixed; top:var(--s5); right:var(--s5); bottom:var(--s5); width:308px; display:flex; flex-direction:column; gap:var(--s3); z-index:3}
+  #metrics, #legend{position:static}
+  #metrics{padding:var(--s4)}
   .metric{display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:2px var(--s3); margin-bottom:var(--s4)}
   .metric:last-child{margin-bottom:0}
   .metric .n{font-family:var(--mono); font-size:15px; font-variant-numeric:tabular-nums}
@@ -74,7 +79,7 @@
   .strip-lab{display:flex; justify-content:space-between; gap:var(--s2); font-size:11px; color:var(--ink-3)}
   .strip-lab b{font-weight:500; color:var(--ink-2); font-family:var(--mono)}
 
-  #legend{bottom:var(--s5); right:var(--s5); width:308px; padding:var(--s4); max-height:56vh; overflow-y:auto; overscroll-behavior:contain}
+  #legend{padding:var(--s4); flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain}
   .legend-item{display:flex; align-items:center; gap:var(--s2); width:100%; background:none; border:none; color:inherit; cursor:pointer; text-align:left; padding:4px 0; font:400 13px/1.3 var(--sans)}
   .legend-item:hover{opacity:.8}
   .legend-item[aria-pressed=true]{color:var(--accent)}
@@ -100,7 +105,8 @@
   @media (max-width:1000px){
     #head{max-width:none; right:var(--s5)}
     #head h1{font-size:20px}
-    #metrics{top:auto; bottom:calc(var(--s5) + 168px); right:var(--s5); width:224px; padding:var(--s3)}
+    .rail{top:auto; bottom:calc(var(--s5) + 156px); width:236px}
+    #metrics{padding:var(--s3)}
     #legend{display:none}
     #layerctl{width:auto; right:var(--s5)}
   }
@@ -116,6 +122,7 @@
     <dt>layers</dt><dd>0 → <span id="fLayers">—</span></dd>
     <dt>hidden size</dt><dd id="fDim">—</dd>
     <dt>sentences</dt><dd id="fSent">—</dd>
+    <dt>per domain</dt><dd id="fPer">—</dd>
     <dt>domains</dt><dd id="fTopics">—</dd>
   </dl>
 </section>
@@ -147,6 +154,7 @@
   </div>
 </section>
 
+<div class="rail">
 <section class="pane" id="metrics">
   <h2>Layer <span id="mLayer">0</span></h2>
   <div class="metric">
@@ -164,6 +172,11 @@
     <div class="bar"><i id="bVar"></i></div>
     <span class="d" id="dVar"></span>
   </div>
+  <div class="metric">
+    <span>Gap inflation</span><span class="n" id="mGap">—</span>
+    <div class="bar"><i id="bGap"></i></div>
+    <span class="d" id="dGap"></span>
+  </div>
   <div>
     <div class="strip-lab"><span>separation by depth</span><b id="stripNote">—</b></div>
     <div class="strip" id="strip"></div>
@@ -175,6 +188,7 @@
   <div id="legendList"></div>
   <p class="strip-lab" id="legendFoot" style="margin:var(--s3) 0 0; padding-top:var(--s3); border-top:1px solid var(--line); display:block">Click a domain to isolate it. Click again to restore all.</p>
 </section>
+</div>
 
 <section class="pane" id="traj">
   <h2>Generation path · final layer, PCA axes</h2>
@@ -215,7 +229,7 @@
   var renderer, scene, camera, points, posAttr, colAttr, sizeAttr;
   // cur starts AT the target: no zoom-in animation on load, and the first painted
   // frame is the framed one (headless captures stop after a few frames)
-  var target = { theta: 0.524, phi: 1.12, r: 2.8 }, cur = { theta: 0.524, phi: 1.12, r: 2.8 };
+  var target = { theta: 2.094, phi: 1.12, r: 3.2 }, cur = { theta: 2.094, phi: 1.12, r: 3.2 };
   var dragging = false, lastP = { x: 0, y: 0 }, hovered = -1, pointer = { x: -2, y: -2 };
   var _pick = new (window.THREE.Vector3)();
   var clock = { t: 0 }, easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
@@ -232,6 +246,7 @@
     document.getElementById('fLayers').textContent = String(d.nLayers - 1);
     document.getElementById('fDim').textContent = d.hiddenSize;
     document.getElementById('fSent').textContent = d.nSentences;
+    document.getElementById('fPer').textContent = Math.round(d.nSentences / d.topics.length);
     document.getElementById('fTopics').textContent = d.topics.length;
     document.getElementById('slider').max = d.nLayers - 1;
     buildLegend(); buildStrip(); buildScene();
@@ -316,6 +331,13 @@
       document.getElementById('bVar').style.transform = 'scaleX(0)';
       document.getElementById('dVar').textContent = 'The neighbourhood layout preserves who is near whom, not how far. Each layer is laid out independently.';
     }
+    var gf = d.spacing.full[l], gv = d.spacing[state.layout === 'pca' ? 'pca' : 'layout'][l];
+    var infl = gv / gf;
+    document.getElementById('mGap').textContent = infl.toFixed(2) + '×';
+    document.getElementById('bGap').style.transform = 'scaleX(' + Math.min(1, infl / 3) + ')';
+    document.getElementById('dGap').innerHTML =
+      'Empty space this view invents. In the full ' + d.hiddenSize + '-d space it is <b>' + gf.toFixed(2) + '×</b>. ' +
+      '1.00× would be faithful spacing.';
     var bars = document.querySelectorAll('.strip button');
     for (var i = 0; i < bars.length; i++) bars[i].setAttribute('aria-current', i === l ? 'true' : 'false');
     if (axisGroup) axisGroup.visible = state.layout === 'pca';
