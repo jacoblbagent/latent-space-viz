@@ -46,19 +46,25 @@ def unit_rms(X):
     return X / (np.sqrt((X ** 2).sum(1).mean()) + 1e-9)
 
 
-FIT = 0.8   # half-extent every layer is fitted into, so framing holds at any depth
+FIT = 0.85     # radius the bulk of every layer is fitted to
+FIT_PCT = 92   # percentile of the radius distribution treated as "the bulk"
 
 
 def fit_layer(P):
-    """Centre one layer's geometry and scale it into a cube of half-extent FIT.
-    Returns (fitted, centre, scale) so other geometry can take the same transform.
-    Framing is the reason: raw norms grow ~1000x with depth, and one shared scale
-    would leave the early layers a dot in the middle of the frame."""
-    c = (P.max(0) + P.min(0)) / 2.0
-    h = float(np.abs(P - c).max())
-    if h == 0:
+    """Centre one layer on its centroid and scale it so the bulk of its points
+    sits at radius FIT. Returns (fitted, centre, scale) so other geometry can take
+    the same transform.
+
+    Centroid, not bounding box: a handful of outliers (UMAP loves a couple) drag a
+    bbox centre far off the mass, which puts the cloud off-centre in the frame.
+    Percentile, not max: same reason, in the scale. Framing across depth is the
+    point - raw norms grow ~1000x, so one shared scale would leave the early
+    layers a dot in the middle of the frame."""
+    c = P.mean(0)
+    rad = float(np.percentile(np.linalg.norm(P - c, axis=1), FIT_PCT))
+    if rad == 0:
         return P - c, c, 1.0
-    return (P - c) / h * FIT, c, h / FIT
+    return (P - c) / rad * FIT, c, rad / FIT
 
 
 def fit_layers(X):
@@ -129,8 +135,7 @@ def main():
         "traj": {"prompt": str(steps["prompt"][0]), "text": str(steps["text"][0]),
                  "coords": np.round(Tp, 4).tolist()},
     }
-    dest = os.path.join(ROOT, "web", "data", "latent.json")
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    dest = os.path.join(ROOT, "data", "latent.json")   # the site is the repo root
     json.dump(out, open(dest, "w"))
     print(f"-> {dest} ({os.path.getsize(dest)/1024:.0f} KB)")
 

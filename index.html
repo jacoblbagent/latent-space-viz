@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Latent Space — hidden states of a small LLM</title>
 <link rel="stylesheet" href="fonts.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <style>
   :root{
     --bg:#171410;
@@ -212,7 +213,9 @@
   };
   var labels3d = [], trajLine, trajMarkers = [], axisGroup;
   var renderer, scene, camera, points, posAttr, colAttr, sizeAttr;
-  var target = { theta: 0.75, phi: 1.12, r: 2.25 }, cur = { theta: 0.75, phi: 1.12, r: 3.2 };
+  // cur starts AT the target: no zoom-in animation on load, and the first painted
+  // frame is the framed one (headless captures stop after a few frames)
+  var target = { theta: 0.524, phi: 1.12, r: 2.8 }, cur = { theta: 0.524, phi: 1.12, r: 2.8 };
   var dragging = false, lastP = { x: 0, y: 0 }, hovered = -1, pointer = { x: -2, y: -2 };
   var _pick = new (window.THREE.Vector3)();
   var clock = { t: 0 }, easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };

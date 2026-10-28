@@ -4,6 +4,9 @@ A single-page WebGL explorer of the internal representation space of
 `Qwen/Qwen2.5-0.5B-Instruct`. Every point is a real sentence run through the real
 model; nothing is simulated, and every number in the UI is measured.
 
+Live: https://jacoblbagent.github.io/latent-space-viz/ — local: :5205, in the
+Visualizations hub at https://jacoblbagent.github.io/visualizations/.
+
 ![view](preview.png)
 
 ## What is actually plotted
@@ -51,11 +54,12 @@ click any bar to jump to that depth.
 ## Running it
 
 ```bash
-./start-latent-space-viz.sh      # prints the URL, serves ./web
+./start-latent-space-viz.sh      # prints the URL, serves the repo root
 ```
 
-Static files only; any static server works. It must be served over HTTP (the page
-fetches `data/latent.json`), not opened as `file://`.
+Static files only — `index.html`, `three.min.js`, `fonts.css`, `fonts/`, `data/latent.json` —
+so any static server works and GitHub Pages serves it with no build step. It must
+be served over HTTP (the page fetches `data/latent.json`), not opened as `file://`.
 
 ## Rebuilding the data
 
@@ -64,7 +68,7 @@ python3 -m venv .venv
 .venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
 .venv/bin/pip install transformers safetensors umap-learn
 .venv/bin/python scripts/extract.py    # model forward passes -> data/hidden.npz, data/traj.npz
-.venv/bin/python scripts/project.py    # PCA + UMAP + metrics  -> web/data/latent.json
+.venv/bin/python scripts/project.py    # PCA + UMAP + metrics  -> data/latent.json
 ```
 
 `scripts/basis_experiment.py` and `scripts/layout_compare.py` are the evidence
@@ -78,11 +82,12 @@ data/corpus.json          the 208 sentences, grouped by domain
 data/hidden.npz           [25 layers, 208 sentences, 896 dims] real hidden states
 data/traj.npz             per-token final-layer states for the generation path
 scripts/extract.py        model -> hidden states
-scripts/project.py        hidden states -> 3D + metrics -> web/data/latent.json
+scripts/project.py        hidden states -> 3D + metrics -> data/latent.json
 scripts/fetch_fonts.py    self-hosts the two typefaces
-web/index.html            the viewer (three.js r160, no build step)
-web/three.min.js          local three.js
-web/fonts.css, web/fonts/ Instrument Sans + IBM Plex Mono, latin subset
+index.html                the viewer (three.js r160, no build step)
+three.min.js              local three.js
+fonts.css, fonts/         Instrument Sans + IBM Plex Mono, latin subset
+assets/favicon.svg        the hub's favicon
 ```
 
 ## Caveats
