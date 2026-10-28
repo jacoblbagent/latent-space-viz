@@ -405,26 +405,40 @@
 
     points = new THREE.Points(ge, new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
-      uniforms: { uPixel: { value: window.innerHeight } },
+      uniforms: {
+        uPixel: { value: window.innerHeight },
+        uFocus: { value: 4.0 },      // world-space depth of the focal plane; set each frame from the camera radius
+        uDof: { value: 0.6 }         // 0 = everything pin sharp, 1 = full defocus for the far plane
+      },
+      // Sharp discs by default. The focal plane sits on the orbit centre, so
+      // whatever distance you are viewing from is the plane in focus; points whose
+      // view-space depth departs from it pick up a small circle of confusion, which
+      // both softens the sprite's edge and spreads it a little.
       vertexShader: [
         'attribute vec3 aColor; attribute float aSize; attribute float aAlpha;',
-        'uniform float uPixel; varying vec3 vColor; varying float vAlpha;',
+        'uniform float uPixel; uniform float uFocus; uniform float uDof;',
+        'varying vec3 vColor; varying float vAlpha; varying float vSoft;',
         'void main(){',
         '  vColor = aColor; vAlpha = aAlpha;',
         '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
-        '  gl_PointSize = aSize * (uPixel / 900.0) * (3.4 / max(0.6, -mv.z));',
+        '  float depth = max(0.6, -mv.z);',
+        '  float coc = clamp(abs(depth - uFocus) / max(0.6, uFocus * 0.32), 0.0, 1.0);',
+        '  vSoft = pow(coc, 1.1) * uDof;',
+        '  gl_PointSize = aSize * (uPixel / 900.0) * (3.4 / depth) * (1.0 + vSoft * 0.5);',
         '  gl_Position = projectionMatrix * mv;',
         '}'
       ].join('\n'),
       fragmentShader: [
         'precision mediump float;',
-        'varying vec3 vColor; varying float vAlpha;',
+        'varying vec3 vColor; varying float vAlpha; varying float vSoft;',
         'void main(){',
         '  vec2 q = gl_PointCoord - vec2(0.5);',
         '  float r = length(q);',
         '  if (r > 0.5) discard;',
-        '  float a = (1.0 - smoothstep(0.28, 0.5, r)) * vAlpha;',
-        '  gl_FragColor = vec4(vColor, a);',
+        '  // edge is a hard rim in focus (0.42 -> 0.5) and widens as vSoft rises',
+        '  float edge = mix(0.42, 0.02, clamp(vSoft, 0.0, 1.0));',
+        '  float a = (1.0 - smoothstep(edge, 0.5, r)) * vAlpha;',
+        '  gl_FragColor = vec4(vColor, a * mix(1.0, 0.85, clamp(vSoft, 0.0, 1.0)));',
         '}'
       ].join('\n')
     }));
@@ -645,6 +659,9 @@
     var sp = Math.sin(cur.phi), cp = Math.cos(cur.phi);
     camera.position.set(cur.r * sp * Math.sin(cur.theta), cur.r * cp, cur.r * sp * Math.cos(cur.theta));
     camera.lookAt(0, 0, 0);
+    // Keep the depth-of-field focal plane on the orbit centre, so the cluster stays
+    // sharp and only the points in front of / behind it go soft, whatever the zoom.
+    points.material.uniforms.uFocus.value = cur.r;
 
     if (pointer.x > -1) {
       var idx = pickNearest();
