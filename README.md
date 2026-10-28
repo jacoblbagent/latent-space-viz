@@ -57,6 +57,17 @@ The metrics panel reports, per layer:
 The bar strip under those numbers is the full-space separation for all 25 layers;
 click any bar to jump to that depth.
 
+## The field guide
+
+The left column carries a tiered guide, not just a title: four tiers (fundamentals,
+how it is built, reading the numbers, limits) holding seven collapsible sections.
+Each section states what the thing is and what it costs — a hidden state, the point
+colour, the layer slider's four regimes, PCA versus UMAP, the four readouts, the
+scale toggles and the generation path, and the four things the picture cannot tell
+you. It quotes the same counts as the header, read from `data/latent.json`, and
+scrolls independently between the header and the controls. It hides below 620px of
+viewport height and under 1000px of width, where the canvas needs the room.
+
 ## Things worth looking at
 
 - Layer 0-2: near-isotropic and tiny — the embedding table's directions are not yet organised by meaning.
@@ -100,7 +111,7 @@ scripts/project.py        hidden states -> 3D + metrics -> data/latent.json
 scripts/fetch_fonts.py    self-hosts the two typefaces
 scripts/layout_tune.py    picks the UMAP spacing by measuring gap inflation vs separation
 scripts/layout_spacing.py how wide the gaps are, in the full space and in 3D
-index.html                the viewer (three.js r160, no build step)
+index.html                the viewer (three.js r160, no build step), field guide included
 three.min.js              local three.js
 fonts.css, fonts/         Instrument Sans + IBM Plex Mono, latin subset
 assets/favicon.svg        the hub's favicon

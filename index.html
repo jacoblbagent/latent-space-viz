@@ -31,7 +31,7 @@
   .pane{position:fixed; z-index:3; background:color-mix(in srgb, var(--surface) 90%, transparent); border:1px solid var(--line); border-radius:var(--r-md)}
   .pane h2{margin:0 0 var(--s3); font-size:12px; font-weight:500; color:var(--ink-3)}
 
-  #head{top:var(--s5); left:var(--s5); padding:var(--s4); max-width:352px}
+  #head{padding:var(--s4)}
   #head h1{margin:0; font-size:25px; font-weight:600; letter-spacing:-.03em}
   #head .model{margin:var(--s1) 0 var(--s3); font-size:13px; line-height:1.45; color:var(--ink-2)}
   #head .model b{font-weight:500; color:var(--ink)}
@@ -39,7 +39,7 @@
   .facts dt{color:var(--ink-3)}
   .facts dd{margin:0; font-family:var(--mono); font-variant-numeric:tabular-nums}
 
-  #layerctl{bottom:var(--s5); left:var(--s5); padding:var(--s3) var(--s4) var(--s4); width:352px}
+  #layerctl{padding:var(--s3) var(--s4) var(--s4)}
   .ctl-top{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:var(--s1)}
   .ctl-top .lab{font-size:12px; color:var(--ink-3)}
   #layerNum{font-family:var(--mono); font-size:16px; font-variant-numeric:tabular-nums}
@@ -58,6 +58,41 @@
   .seg button:hover:not([aria-pressed=true]){opacity:.8}
   .ctl-foot{display:flex; align-items:center; justify-content:space-between; gap:var(--s3); margin-top:var(--s3)}
   .ctl-foot + .ctl-foot{margin-top:var(--s2)}
+
+  /* Left column: header, field guide, controls — one stack, mirroring the right
+     rail, so the guide takes whatever height the viewport leaves between the two
+     fixed cards instead of floating over the canvas with its own anchor. */
+  .lrail{position:fixed; top:var(--s5); left:var(--s5); bottom:var(--s5); width:352px; display:flex; flex-direction:column; gap:var(--s3); z-index:3}
+  #head,#docs,#layerctl,#traj{position:static; flex:0 0 auto}
+  #docs{padding:var(--s4) var(--s4) var(--s2); flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain}
+  #docs h2{margin-bottom:var(--s2)}
+  #docs .lede{margin:0; font-size:12.5px; line-height:1.5; color:var(--ink-2)}
+  .tier{margin:var(--s4) 0 var(--s1); font:500 10px/1 var(--mono); letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3)}
+  details.doc{border-top:1px solid var(--line)}
+  details.doc:last-of-type{border-bottom:1px solid var(--line)}
+  summary{display:flex; align-items:baseline; gap:var(--s2); padding:8px 0; cursor:pointer; list-style:none; font-size:13px; line-height:1.35; color:var(--ink)}
+  summary::-webkit-details-marker{display:none}
+  summary:hover .t{color:var(--accent)}
+  summary .n{flex:0 0 auto; min-width:13px; font:500 10.5px/1.4 var(--mono); color:var(--ink-3)}
+  summary .chev{flex:0 0 auto; margin-left:auto; padding-left:var(--s2); color:var(--ink-3); font-size:12px; line-height:1; transition:transform .15s ease-out}
+  details[open]>summary .chev{transform:rotate(90deg)}
+  .doc .body{padding:0 var(--s2) var(--s3) 21px; font-size:12.5px; line-height:1.55; color:var(--ink-2)}
+  .doc .body p{margin:0 0 var(--s2)}
+  .doc .body p:last-child,.doc .body dl:last-child,.doc .body ul:last-child{margin-bottom:0}
+  .doc .body b,.doc .body strong{font-weight:500; color:var(--ink)}
+  .doc .body .k{font-family:var(--mono); font-size:11.5px; color:var(--ink)}
+  .doc .body ul{margin:0 0 var(--s2); padding-left:14px}
+  .doc .body li{margin-bottom:5px}
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:5px var(--s3); margin:0 0 var(--s2)}
+  .kv dt{font:500 10.5px/1.6 var(--mono); color:var(--ink); white-space:nowrap}
+  .kv dd{margin:0}
+  details.doc details{border-top:1px solid var(--line); margin-top:var(--s3)}
+  details.doc details summary{font-size:12px; color:var(--ink-2); padding:6px 0}
+  details.doc details .body{padding-left:0}
+  #docs{scrollbar-width:thin; scrollbar-color:var(--line) transparent}
+  #docs::-webkit-scrollbar{width:8px}
+  #docs::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px}
+  #docs::-webkit-scrollbar-track{background:none}
 
   /* One right-hand rail, stacked: the readout sizes to its content and the legend
      takes what is left and scrolls. Two independently anchored panels collided as
@@ -87,7 +122,7 @@
   .legend-item .name{flex:1 1 auto}
   .legend-item .count{font-family:var(--mono); font-size:11px; color:var(--ink-3); background:var(--surface-2); border-radius:var(--r-sm); padding:2px 5px}
 
-  #traj{bottom:calc(var(--s5) + 200px); left:var(--s5); width:352px; padding:var(--s4); display:none}
+  #traj{padding:var(--s4); display:none}
   #traj.on{display:block}
   #traj .prompt{font-size:12px; color:var(--ink-3); margin:0 0 var(--s1)}
   #traj .out{font-size:13px; line-height:1.45; margin:0}
@@ -102,19 +137,23 @@
   #loading{position:fixed; inset:0; z-index:2; display:grid; place-items:center; color:var(--ink-3); font-size:13px; background:var(--bg)}
 
   @media (max-width:1240px){ #traj{display:none !important} }
+  @media (max-height:620px){ #docs{display:none} }
   @media (max-width:1000px){
-    #head{max-width:none; right:var(--s5)}
+    .lrail{width:auto; right:var(--s5)}
+    #head{max-width:none; right:auto}
     #head h1{font-size:20px}
+    #docs{display:none}
     .rail{top:auto; bottom:calc(var(--s5) + 156px); width:236px}
     #metrics{padding:var(--s3)}
     #legend{display:none}
-    #layerctl{width:auto; right:var(--s5)}
+    #layerctl{width:auto; right:auto}
   }
 </style>
 </head>
 <body>
 <canvas id="scene"></canvas>
 
+<div class="lrail">
 <section class="pane" id="head">
   <h1>Latent Space</h1>
   <p class="model"><b id="modelName">—</b> hidden states, mean-pooled per sentence, drawn in 3D.</p>
@@ -125,6 +164,106 @@
     <dt>per domain</dt><dd id="fPer">—</dd>
     <dt>domains</dt><dd id="fTopics">—</dd>
   </dl>
+</section>
+
+<section class="pane" id="docs">
+  <h2>Field guide</h2>
+  <p class="lede">Every dot is one real sentence pushed through a real model. What the picture is, how it was built, and where it stops being trustworthy.</p>
+
+  <p class="tier">01 · fundamentals</p>
+
+  <details class="doc" open>
+    <summary><span class="n">1</span><span class="t">What a hidden state is</span><span class="chev">›</span></summary>
+    <div class="body">
+      <p>The model never sees words. A sentence is split into tokens, and each of the <b id="docLayers">24</b> transformer layers rewrites a vector for every one of them. Averaging the token vectors at the end of a layer leaves a single vector of <b class="k" id="docDim">896</b> numbers — that sentence's <b>mean-pooled hidden state</b> at that depth.</p>
+      <p>One dot is one sentence at one layer. Nothing here is simulated: the geometry is the model's own, flattened to three axes so it fits on a screen.</p>
+    </div>
+  </details>
+
+  <details class="doc">
+    <summary><span class="n">2</span><span class="t">What the dots and colours mean</span><span class="chev">›</span></summary>
+    <div class="body">
+      <p><b id="docSent">416</b> hand-written sentences across <b id="docTopics">13</b> domains, <b id="docPer">32</b> per domain. Colour is the domain label, applied by the author and never shown to the model — so a domain landing together means the model arranged those sentences similarly on its own.</p>
+      <p>Hover a point to read the sentence and how many of its five nearest neighbours share its domain <b>in the view you are looking at</b>. Click a domain in the legend to isolate it; click again to restore all.</p>
+    </div>
+  </details>
+
+  <p class="tier">02 · how it is built</p>
+
+  <details class="doc">
+    <summary><span class="n">3</span><span class="t">Depth: reading the layer slider</span><span class="chev">›</span></summary>
+    <div class="body">
+      <p>Layer 0 is the embedding table; layer <b id="docLast">24</b> is the last transformer block — 25 tensors in all. The same sentence is a different point at every depth, and that is the subject of the piece:</p>
+      <dl class="kv">
+        <dt>0–2</dt><dd>Tiny and near-isotropic. Directions are not yet organised by meaning.</dd>
+        <dt>3–21</dt><dd>Variance collapses into a few “rogue” directions — the three PCA axes hold ~94% of it — and topical purity plateaus around 45–60%.</dd>
+        <dt>22–23</dt><dd>Purity jumps to ~92% and, in the neighbourhood layout, thirteen tight islands appear.</dd>
+        <dt>24</dt><dd>The norm explodes to roughly 1000×. That is the signature of the huge activations feeding the output head.</dd>
+      </dl>
+      <p>Arrow keys step one layer; space plays through all of them.</p>
+    </div>
+  </details>
+
+  <details class="doc">
+    <summary><span class="n">4</span><span class="t">Two layouts, and what a distance means</span><span class="chev">›</span></summary>
+    <div class="body">
+      <p>Both layouts draw the same activations. They make different promises.</p>
+      <dl class="kv">
+        <dt>PCA</dt><dd>One shared linear basis for every layer, so the slider moves the model inside a fixed frame. Distances and cluster gaps are meaningful. Cost: at layer 23 it shows only 40% separation — the semantic structure is not three-dimensional, and a linear view squashes it into a cigar.</dd>
+        <dt>UMAP</dt><dd>Fitted per layer so semantic neighbours land together: ~90% separation at layer 23. Cost: distances are not metric, gap width is approximate, and two layers cannot be compared position by position.</dd>
+      </dl>
+      <details>
+        <summary>Why these UMAP settings?<span class="chev">›</span></summary>
+        <div class="body">
+          <p>100 neighbours, <span class="k">min_dist=0.6</span>, picked by measuring gap inflation rather than by eye. The first attempt (15, 0.12) drew moats 3.47× wider than the full 896-d space supports; this pair holds inflation near 1.17× while keeping separation near 92%. Fewer sentences per domain inflates the gaps further, which is why the corpus is 32 per domain rather than 8.</p>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <p class="tier">03 · reading the numbers</p>
+
+  <details class="doc">
+    <summary><span class="n">5</span><span class="t">The four readouts</span><span class="chev">›</span></summary>
+    <div class="body">
+      <dl class="kv">
+        <dt>Separation</dt><dd>Share of each sentence's five nearest neighbours that share its domain, measured inside the view. Compare it with the full-space figure in the same caption. High means the structure survived the projection.</dd>
+        <dt>Spread</dt><dd>Mean squared norm of the centred state, relative to the widest layer. It grows about 1000× from layer 0 to 24.</dd>
+        <dt>Variance</dt><dd>PCA only: how much of the layer's variance the plotted axes capture. Neighbourhood layouts report “not metric” instead, because they do not have axes.</dd>
+        <dt>Gap inflation</dt><dd>How much wider the gaps read here than in the full 896-d space. 1.00× is faithful; 3.00× is a moat the data does not have; below 1.00× means domains are being collapsed onto each other, which is what the linear view does (0.40× at layer 22).</dd>
+      </dl>
+      <p>The bar strip underneath is full-space separation for all 25 layers. Click any bar to jump to that depth.</p>
+    </div>
+  </details>
+
+  <details class="doc">
+    <summary><span class="n">6</span><span class="t">Scale, and the generation path</span><span class="chev">›</span></summary>
+    <div class="body">
+      <p><b>Normalised</b> fits each layer into a fixed cube so every depth is legible. <b>True scale</b> uses the real per-layer norms, so layer 24 dominates — the shapes differ between the two modes, and that difference is itself the measurement.</p>
+      <p><b>Generation path</b> asks the model to write about the ocean, embeds each greedy token step, and draws the trajectory through the final layer's PCA frame. It stays in one neighbourhood instead of wandering. It is only valid on the final layer with PCA axes, which is why the toggle switches both.</p>
+    </div>
+  </details>
+
+  <p class="tier">04 · limits</p>
+
+  <details class="doc">
+    <summary><span class="n">7</span><span class="t">What this cannot tell you</span><span class="chev">›</span></summary>
+    <div class="body">
+      <ul>
+        <li><b id="docSent2">416</b> sentences is a small sample. The layer profiles are indicative, not a benchmark.</li>
+        <li>Mean pooling is one summary of a layer. Token-level geometry — how an individual word moves — is not shown.</li>
+        <li>UMAP layouts are stochastic and fitted independently per layer, so positions only compare within a single layer.</li>
+        <li>Clustering is not comprehension: a domain holding together does not mean the model has a concept of that domain, only that it represents those sentences similarly.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<section class="pane" id="traj">
+  <h2>Generation path · final layer, PCA axes</h2>
+  <p class="prompt" id="trajPrompt"></p>
+  <p class="out" id="trajOut"></p>
+  <p class="foot" id="trajFoot"></p>
 </section>
 
 <section class="pane" id="layerctl">
@@ -153,6 +292,7 @@
     </div>
   </div>
 </section>
+</div>
 
 <div class="rail">
 <section class="pane" id="metrics">
@@ -189,13 +329,6 @@
   <p class="strip-lab" id="legendFoot" style="margin:var(--s3) 0 0; padding-top:var(--s3); border-top:1px solid var(--line); display:block">Click a domain to isolate it. Click again to restore all.</p>
 </section>
 </div>
-
-<section class="pane" id="traj">
-  <h2>Generation path · final layer, PCA axes</h2>
-  <p class="prompt" id="trajPrompt"></p>
-  <p class="out" id="trajOut"></p>
-  <p class="foot" id="trajFoot"></p>
-</section>
 
 <div id="tip"></div>
 <div id="loading">Extracting hidden states…</div>
@@ -249,6 +382,13 @@
     document.getElementById('fPer').textContent = Math.round(d.nSentences / d.topics.length);
     document.getElementById('fTopics').textContent = d.topics.length;
     document.getElementById('slider').max = d.nLayers - 1;
+    // the field guide quotes the same numbers the header does, taken from the data
+    var docNums = { docLayers: d.nLayers - 1, docLast: d.nLayers - 1, docDim: d.hiddenSize,
+                    docSent: d.nSentences, docSent2: d.nSentences,
+                    docPer: Math.round(d.nSentences / d.topics.length), docTopics: d.topics.length };
+    Object.keys(docNums).forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.textContent = String(docNums[id]);
+    });
     buildLegend(); buildStrip(); buildScene();
     selectLayer(Math.min(DEFAULT_LAYER, d.nLayers - 1), true);
     window.__app = {
