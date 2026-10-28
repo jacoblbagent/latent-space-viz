@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latent Space — hidden states of a small LLM</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  :root{
+    --bg:#171410;
+    --surface:#1f1c17;
+    --surface-2:#262219;
+    --line:#39332a;
+    --ink:#ece6dc;
+    --ink-2:#b3aa9c;
+    --ink-3:#8c8477;
+    --accent:#dda45f;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    --sans:"Instrument Sans",system-ui,sans-serif;
+    --r-sm:4px; --r-md:10px;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg); color:var(--ink); font:400 14px/1.5 var(--sans); overflow:hidden; -webkit-font-smoothing:antialiased; touch-action:manipulation}
+  ::selection{background:var(--accent); color:#1a1611}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  canvas{display:block}
+  #scene{position:fixed; inset:0; z-index:0}
+  .pane{position:fixed; z-index:3; background:color-mix(in srgb, var(--surface) 90%, transparent); border:1px solid var(--line); border-radius:var(--r-md)}
+  .pane h2{margin:0 0 var(--s3); font-size:12px; font-weight:500; color:var(--ink-3)}
+
+  #head{top:var(--s5); left:var(--s5); padding:var(--s4); max-width:352px}
+  #head h1{margin:0; font-size:25px; font-weight:600; letter-spacing:-.03em}
+  #head .model{margin:var(--s1) 0 var(--s3); font-size:13px; line-height:1.45; color:var(--ink-2)}
+  #head .model b{font-weight:500; color:var(--ink)}
+  .facts{display:grid; grid-template-columns:auto 1fr; gap:2px var(--s4); margin:0; font-size:12px}
+  .facts dt{color:var(--ink-3)}
+  .facts dd{margin:0; font-family:var(--mono); font-variant-numeric:tabular-nums}
+
+  #layerctl{bottom:var(--s5); left:var(--s5); padding:var(--s3) var(--s4) var(--s4); width:352px}
+  .ctl-top{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:var(--s1)}
+  .ctl-top .lab{font-size:12px; color:var(--ink-3)}
+  #layerNum{font-family:var(--mono); font-size:16px; font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:20px; background:none; margin:0}
+  input[type=range]::-webkit-slider-runnable-track{height:2px; background:var(--line)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; margin-top:-6px; border-radius:50%; background:var(--ink); border:none; cursor:grab}
+  input[type=range]::-moz-range-track{height:2px; background:var(--line)}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border:none;border-radius:50%;background:var(--ink)}
+  .iconbtn{flex:0 0 auto; display:grid; place-items:center; width:32px; height:32px; background:none; border:1px solid var(--line); border-radius:var(--r-sm); color:var(--ink); cursor:pointer; padding:0}
+  .iconbtn:hover{opacity:.8}
+  .iconbtn[aria-pressed=true]{border-color:var(--accent); color:var(--accent)}
+  .seg{display:flex; border:1px solid var(--line); border-radius:var(--r-sm); overflow:hidden}
+  .seg button{background:none; border:none; color:var(--ink-2); font:500 11px/1 var(--sans); padding:9px 10px; cursor:pointer; white-space:nowrap}
+  .seg button + button{border-left:1px solid var(--line)}
+  .seg button[aria-pressed=true]{color:var(--ink); background:var(--surface-2)}
+  .seg button:hover:not([aria-pressed=true]){opacity:.8}
+  .ctl-foot{display:flex; align-items:center; justify-content:space-between; gap:var(--s3); margin-top:var(--s3)}
+  .ctl-foot + .ctl-foot{margin-top:var(--s2)}
+
+  #metrics{top:var(--s5); right:var(--s5); width:308px; padding:var(--s4)}
+  .metric{display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:2px var(--s3); margin-bottom:var(--s4)}
+  .metric:last-child{margin-bottom:0}
+  .metric .n{font-family:var(--mono); font-size:15px; font-variant-numeric:tabular-nums}
+  .metric .d{grid-column:1/3; font-size:11px; line-height:1.4; color:var(--ink-3)}
+  .metric .d b{font-weight:500; color:var(--ink-2); font-family:var(--mono)}
+  .bar{grid-column:1/3; height:2px; background:var(--line); margin-top:2px}
+  .bar i{display:block; height:100%; background:var(--accent); transform-origin:left center; transform:scaleX(0)}
+  .strip{display:flex; align-items:flex-end; gap:1px; height:58px; margin:var(--s2) 0 var(--s1); border-bottom:1px solid var(--line)}
+  .strip button{flex:1 1 auto; padding:0; border:none; background:var(--line); cursor:pointer; min-width:0}
+  .strip button:hover{background:var(--ink-3)}
+  .strip button[aria-current=true]{background:var(--accent)}
+  .strip-lab{display:flex; justify-content:space-between; gap:var(--s2); font-size:11px; color:var(--ink-3)}
+  .strip-lab b{font-weight:500; color:var(--ink-2); font-family:var(--mono)}
+
+  #legend{bottom:var(--s5); right:var(--s5); width:308px; padding:var(--s4); max-height:56vh; overflow-y:auto; overscroll-behavior:contain}
+  .legend-item{display:flex; align-items:center; gap:var(--s2); width:100%; background:none; border:none; color:inherit; cursor:pointer; text-align:left; padding:4px 0; font:400 13px/1.3 var(--sans)}
+  .legend-item:hover{opacity:.8}
+  .legend-item[aria-pressed=true]{color:var(--accent)}
+  .dot{flex:0 0 auto; width:8px; height:8px; border-radius:50%}
+  .legend-item .name{flex:1 1 auto}
+  .legend-item .count{font-family:var(--mono); font-size:11px; color:var(--ink-3); background:var(--surface-2); border-radius:var(--r-sm); padding:2px 5px}
+
+  #traj{bottom:calc(var(--s5) + 200px); left:var(--s5); width:352px; padding:var(--s4); display:none}
+  #traj.on{display:block}
+  #traj .prompt{font-size:12px; color:var(--ink-3); margin:0 0 var(--s1)}
+  #traj .out{font-size:13px; line-height:1.45; margin:0}
+  #traj .foot{margin:var(--s2) 0 0; font:400 11px/1.4 var(--mono); color:var(--ink-3)}
+
+  #tip{position:fixed; z-index:5; pointer-events:none; max-width:300px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--s2) var(--s3); font-size:12px; line-height:1.4; opacity:0; transform:translateY(2px); transition:opacity .12s ease-out, transform .12s ease-out}
+  #tip.on{opacity:1; transform:none}
+  #tip .y{display:flex; align-items:center; gap:6px; margin-top:4px; color:var(--ink-3); font-size:11px}
+  #tip .dim{color:var(--ink-3); margin-top:4px; font-family:var(--mono); font-size:10.5px}
+
+  #notice{position:fixed; inset:auto 0 0 0; z-index:6; display:none; background:#3a1d16; border-top:1px solid #7a3d2c; color:#f3ddd4; padding:var(--s3) var(--s5); font:400 12px/1.4 var(--mono)}
+  #loading{position:fixed; inset:0; z-index:2; display:grid; place-items:center; color:var(--ink-3); font-size:13px; background:var(--bg)}
+
+  @media (max-width:1240px){ #traj{display:none !important} }
+  @media (max-width:1000px){
+    #head{max-width:none; right:var(--s5)}
+    #head h1{font-size:20px}
+    #metrics{top:auto; bottom:calc(var(--s5) + 168px); right:var(--s5); width:224px; padding:var(--s3)}
+    #legend{display:none}
+    #layerctl{width:auto; right:var(--s5)}
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<section class="pane" id="head">
+  <h1>Latent Space</h1>
+  <p class="model"><b id="modelName">—</b> hidden states, mean-pooled per sentence, drawn in 3D.</p>
+  <dl class="facts">
+    <dt>layers</dt><dd>0 → <span id="fLayers">—</span></dd>
+    <dt>hidden size</dt><dd id="fDim">—</dd>
+    <dt>sentences</dt><dd id="fSent">—</dd>
+    <dt>domains</dt><dd id="fTopics">—</dd>
+  </dl>
+</section>
+
+<section class="pane" id="layerctl">
+  <div class="ctl-top">
+    <span class="lab">Representation depth</span>
+    <span id="layerNum">0 / 0</span>
+  </div>
+  <input id="slider" type="range" min="0" max="0" value="0" step="1" aria-label="Layer">
+  <div class="ctl-foot">
+    <div class="seg" role="group" aria-label="Layout">
+      <button id="lyPCA" aria-pressed="false">linear · PCA</button>
+      <button id="lyKNN" aria-pressed="true">neighbourhood · UMAP</button>
+    </div>
+    <button class="iconbtn" id="play" aria-label="Play through layers" aria-pressed="false">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 2l9 5-9 5z" fill="currentColor"/></svg>
+    </button>
+  </div>
+  <div class="ctl-foot">
+    <div class="seg" role="group" aria-label="Scale">
+      <button id="scUnit" aria-pressed="true">normalised</button>
+      <button id="scRaw" aria-pressed="false">true scale</button>
+    </div>
+    <div class="seg" role="group" aria-label="Overlays">
+      <button id="tgLabels" aria-pressed="true">labels</button>
+      <button id="tgTraj" aria-pressed="false">generation path</button>
+    </div>
+  </div>
+</section>
+
+<section class="pane" id="metrics">
+  <h2>Layer <span id="mLayer">0</span></h2>
+  <div class="metric">
+    <span>Cluster separation</span><span class="n" id="mSep">—</span>
+    <div class="bar"><i id="bSep"></i></div>
+    <span class="d" id="dSep"></span>
+  </div>
+  <div class="metric">
+    <span>Representation spread</span><span class="n" id="mSpread">—</span>
+    <div class="bar"><i id="bSpread"></i></div>
+    <span class="d">Mean squared norm of the centred state, relative to the widest layer.</span>
+  </div>
+  <div class="metric">
+    <span id="mVarLabel">Variance on the three axes</span><span class="n" id="mVar">—</span>
+    <div class="bar"><i id="bVar"></i></div>
+    <span class="d" id="dVar"></span>
+  </div>
+  <div>
+    <div class="strip-lab"><span>separation by depth</span><b id="stripNote">—</b></div>
+    <div class="strip" id="strip"></div>
+  </div>
+</section>
+
+<section class="pane" id="legend">
+  <h2>Domains <span id="lCount" style="color:var(--ink);font-family:var(--mono)"></span></h2>
+  <div id="legendList"></div>
+  <p class="strip-lab" id="legendFoot" style="margin:var(--s3) 0 0; padding-top:var(--s3); border-top:1px solid var(--line); display:block">Click a domain to isolate it. Click again to restore all.</p>
+</section>
+
+<section class="pane" id="traj">
+  <h2>Generation path · final layer, PCA axes</h2>
+  <p class="prompt" id="trajPrompt"></p>
+  <p class="out" id="trajOut"></p>
+  <p class="foot" id="trajFoot"></p>
+</section>
+
+<div id="tip"></div>
+<div id="loading">Extracting hidden states…</div>
+<div id="notice"></div>
+
+<script src="three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var notice = document.getElementById('notice');
+  function fail(msg) {
+    notice.style.display = 'block';
+    notice.textContent = msg;
+    document.getElementById('loading').style.display = 'none';
+  }
+  window.addEventListener('error', function (e) { fail('Render error: ' + (e.message || e.type)); });
+
+  var COLORS = {
+    animals:'#5f9e63', cooking:'#dd8a3c', programming:'#5c8fd6', mathematics:'#a273c9',
+    weather:'#3fb0aa', music:'#e26a9c', medicine:'#cf503f', law:'#b3a94f',
+    space:'#7a74d9', sports:'#e08c7a', finance:'#a8c060', literature:'#c9a25f',
+    technology:'#8fa6b8'
+  };
+  var DEFAULT_LAYER = 22;
+  var state = {
+    data: null, layer: 0, layout: 'layout', mode: 'unit', solo: null,
+    labels: true, traj: false, playing: false,
+    from: null, to: null, t: 1, dur: 0.45, dwell: 0
+  };
+  var labels3d = [], trajLine, trajMarkers = [], axisGroup;
+  var renderer, scene, camera, points, posAttr, colAttr, sizeAttr;
+  var target = { theta: 0.75, phi: 1.12, r: 2.25 }, cur = { theta: 0.75, phi: 1.12, r: 3.2 };
+  var dragging = false, lastP = { x: 0, y: 0 }, hovered = -1, pointer = { x: -2, y: -2 };
+  var _pick = new (window.THREE.Vector3)();
+  var clock = { t: 0 }, easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
+
+  fetch('data/latent.json').then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(init).catch(function (e) { fail('Could not load data/latent.json — ' + e.message); });
+
+  function init(d) {
+    state.data = d;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('modelName').textContent = d.model;
+    document.getElementById('fLayers').textContent = String(d.nLayers - 1);
+    document.getElementById('fDim').textContent = d.hiddenSize;
+    document.getElementById('fSent').textContent = d.nSentences;
+    document.getElementById('fTopics').textContent = d.topics.length;
+    document.getElementById('slider').max = d.nLayers - 1;
+    buildLegend(); buildStrip(); buildScene();
+    selectLayer(Math.min(DEFAULT_LAYER, d.nLayers - 1), true);
+    window.__app = {
+      state: state, layerCount: d.nLayers, setLayer: selectLayer,
+      setLayout: setLayout, setScale: setMode, camera: camera, renderer: renderer,
+      scene: function () { return scene; }, points: function () { return points; },
+      sep: function (l) { return viewSep(l); }
+    };
+  }
+
+  /* ---------- HUD ---------- */
+  function buildLegend() {
+    var d = state.data, list = document.getElementById('legendList'), counts = {};
+    d.sentences.forEach(function (s) { counts[s.y] = (counts[s.y] || 0) + 1; });
+    d.topics.forEach(function (t) {
+      var b = document.createElement('button');
+      b.className = 'legend-item';
+      b.setAttribute('aria-pressed', 'false');
+      b.dataset.topic = t;
+      b.innerHTML = '<span class="dot" style="background:' + COLORS[t] + '"></span>' +
+        '<span class="name">' + t + '</span><span class="count">' + counts[t] + '</span>';
+      b.addEventListener('click', function () { setSolo(state.solo === t ? null : t); });
+      list.appendChild(b);
+    });
+    document.getElementById('lCount').textContent = d.topics.length;
+    buildLegend.counts = counts;
+  }
+  function buildStrip() {
+    var d = state.data, strip = document.getElementById('strip');
+    d.purityFull.forEach(function (p, i) {
+      var b = document.createElement('button');
+      b.style.height = (14 + p * 86) + '%';
+      b.dataset.layer = i;
+      b.title = 'layer ' + i + ' · separation ' + (p * 100).toFixed(1) + '%';
+      b.setAttribute('aria-label', b.title);
+      b.addEventListener('click', function () { setPlaying(false); selectLayer(i); });
+      strip.appendChild(b);
+    });
+    var mn = Math.min.apply(null, d.purityFull), mx = Math.max.apply(null, d.purityFull);
+    document.getElementById('stripNote').textContent =
+      'full space ' + (mn * 100).toFixed(0) + '–' + (mx * 100).toFixed(0) + '%';
+  }
+  function viewSep(l) {
+    var d = state.data;
+    return state.layout === 'pca' ? d.purityPca[l] : d.purityLayout[l];
+  }
+  function setSolo(t) {
+    state.solo = t;
+    var items = document.querySelectorAll('.legend-item');
+    for (var i = 0; i < items.length; i++) {
+      items[i].setAttribute('aria-pressed', items[i].dataset.topic === t ? 'true' : 'false');
+    }
+    document.getElementById('legendFoot').textContent = t
+      ? 'Showing ' + t + ' only — click the domain again to restore all ' + state.data.topics.length + '.'
+      : 'Click a domain to isolate it. Click again to restore all.';
+    refreshColors();
+  }
+  function selectLayer(l, instant) {
+    var d = state.data;
+    l = Math.max(0, Math.min(d.nLayers - 1, l));
+    state.layer = l;
+    document.getElementById('slider').value = String(l);
+    document.getElementById('layerNum').textContent = l + ' / ' + (d.nLayers - 1);
+    document.getElementById('mLayer').textContent = String(l);
+    var sep = viewSep(l), sp = d.spread[l], vr = d.varRatio[l], full = d.purityFull[l];
+    document.getElementById('mSep').textContent = (sep * 100).toFixed(1) + '%';
+    document.getElementById('bSep').style.transform = 'scaleX(' + sep + ')';
+    document.getElementById('dSep').innerHTML = 'Share of each sentence\'s 5 nearest neighbours in this view that share its domain. In the full ' +
+      d.hiddenSize + '-d space the same measure is <b>' + (full * 100).toFixed(0) + '%</b>.';
+    document.getElementById('mSpread').textContent = (sp * 100).toFixed(1) + '%';
+    document.getElementById('bSpread').style.transform = 'scaleX(' + sp + ')';
+    if (state.layout === 'pca') {
+      document.getElementById('mVarLabel').textContent = 'Variance on the three axes';
+      document.getElementById('mVar').textContent = (vr * 100).toFixed(1) + '%';
+      document.getElementById('bVar').style.transform = 'scaleX(' + vr + ')';
+      document.getElementById('dVar').textContent = 'Share of this layer\'s variance captured by the plotted principal axes.';
+    } else {
+      document.getElementById('mVarLabel').textContent = 'Distances';
+      document.getElementById('mVar').textContent = 'not metric';
+      document.getElementById('bVar').style.transform = 'scaleX(0)';
+      document.getElementById('dVar').textContent = 'The neighbourhood layout preserves who is near whom, not how far. Each layer is laid out independently.';
+    }
+    var bars = document.querySelectorAll('.strip button');
+    for (var i = 0; i < bars.length; i++) bars[i].setAttribute('aria-current', i === l ? 'true' : 'false');
+    if (axisGroup) axisGroup.visible = state.layout === 'pca';
+    startMorph(l, instant);
+  }
+  function startMorph(l, instant) {
+    var next = coordsFor(l), d = state.data;
+    if (instant || !state.to) { state.from = null; state.to = next; state.t = 1; posAttr.array.set(next); posAttr.needsUpdate = true; }
+    else { state.from = new Float32Array(posAttr.array); state.to = next; state.t = 0;
+           state.dur = state.layout === 'pca' ? 0.45 : 0.3; }
+    var acc = {};
+    d.topics.forEach(function (t) { acc[t] = [0, 0, 0, 0]; });
+    for (var i = 0; i < d.nSentences; i++) {
+      var a = acc[d.sentences[i].y];
+      a[0] += next[i * 3]; a[1] += next[i * 3 + 1]; a[2] += next[i * 3 + 2]; a[3]++;
+    }
+    labels3d.forEach(function (o) {
+      if (o.isTraj || !o.topic) return;
+      var a = acc[o.topic]; if (!a || !a[3]) return;
+      o.sprite.position.set(a[0] / a[3], a[1] / a[3], a[2] / a[3]);
+      o.sprite.userData.base.copy(o.sprite.position);
+    });
+    updateTrajVisible();
+  }
+  function coordsFor(l) {
+    var d = state.data, src = d.coords[state.layout][l];
+    var out = new Float32Array(src.length * 3);
+    var f = state.mode === 'unit' ? 1 : 2.0 * d.spread[l];
+    for (var i = 0; i < src.length; i++) {
+      out[i * 3] = src[i][0] * f;
+      out[i * 3 + 1] = src[i][1] * f;
+      out[i * 3 + 2] = src[i][2] * f;
+    }
+    return out;
+  }
+  function updateTrajVisible() {
+    if (!state.traj) return;
+    var on = state.layer === state.data.nLayers - 1 && state.layout === 'pca';
+    labels3d.forEach(function (o) { if (o.isTraj) o.sprite.visible = on; });
+  }
+
+  /* ---------- three.js ---------- */
+  function buildScene() {
+    var d = state.data, N = d.nSentences;
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene'), antialias: true });
+    renderer.setPixelRatio(1);
+    renderer.setClearColor(0x171410, 1);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+    resize();
+    window.addEventListener('resize', resize);
+
+    var ge = new THREE.BufferGeometry();
+    var pos = new Float32Array(N * 3), col = new Float32Array(N * 3), sz = new Float32Array(N);
+    var c = new THREE.Color();
+    for (var i = 0; i < N; i++) {
+      c.set(COLORS[d.sentences[i].y] || '#999999');
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; sz[i] = 8.5;
+    }
+    ge.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    ge.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    ge.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
+    ge.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(N).fill(1), 1));
+    posAttr = ge.attributes.position; colAttr = ge.attributes.aColor; sizeAttr = ge.attributes.aSize;
+
+    points = new THREE.Points(ge, new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false,
+      uniforms: { uPixel: { value: window.innerHeight } },
+      vertexShader: [
+        'attribute vec3 aColor; attribute float aSize; attribute float aAlpha;',
+        'uniform float uPixel; varying vec3 vColor; varying float vAlpha;',
+        'void main(){',
+        '  vColor = aColor; vAlpha = aAlpha;',
+        '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+        '  gl_PointSize = aSize * (uPixel / 900.0) * (3.4 / max(0.6, -mv.z));',
+        '  gl_Position = projectionMatrix * mv;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'precision mediump float;',
+        'varying vec3 vColor; varying float vAlpha;',
+        'void main(){',
+        '  vec2 q = gl_PointCoord - vec2(0.5);',
+        '  float r = length(q);',
+        '  if (r > 0.5) discard;',
+        '  float a = (1.0 - smoothstep(0.28, 0.5, r)) * vAlpha;',
+        '  gl_FragColor = vec4(vColor, a);',
+        '}'
+      ].join('\n')
+    }));
+    points.frustumCulled = false;
+    scene.add(points);
+
+    axisGroup = new THREE.Group();
+    var axisLen = 1.5;
+    [['x', 1, 0, 0], ['y', 0, 1, 0], ['z', 0, 0, 1]].forEach(function (a, ai) {
+      var g = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-a[1] * axisLen, -a[2] * axisLen, -a[3] * axisLen),
+        new THREE.Vector3(a[1] * axisLen, a[2] * axisLen, a[3] * axisLen)]);
+      axisGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x4a4237, transparent: true, opacity: 0.8 })));
+      var axSp = makeSprite('PC' + (ai + 1) + '  ' + (d.pcVar[ai] * 100).toFixed(0) + '%',
+        new THREE.Vector3(a[1] * (axisLen + 0.14), a[2] * (axisLen + 0.14), a[3] * (axisLen + 0.14)), '#8c8477', false, 21);
+      axisGroup.add(axSp);
+      labels3d.push({ sprite: axSp, isTraj: false, isAxis: true });
+    });
+    scene.add(axisGroup);
+
+    d.topics.forEach(function (t) {
+      var sp = makeSprite(t, new THREE.Vector3(), COLORS[t], true, 22);
+      sp.userData.topic = t;
+      labels3d.push({ sprite: sp, isTraj: false, topic: t });
+    });
+
+    var T = d.traj.coords.length, tg = new THREE.BufferGeometry();
+    tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(T * 3), 3));
+    trajLine = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: 0xf2e7d5, transparent: true, opacity: 0.85 }));
+    trajLine.visible = false; trajLine.frustumCulled = false; scene.add(trajLine);
+    for (var k = 0; k < T; k++) {
+      var m = new THREE.Mesh(new THREE.SphereGeometry(k === T - 1 ? 0.022 : 0.009, 8, 6),
+        new THREE.MeshBasicMaterial({ color: k === T - 1 ? 0xf2e7d5 : 0xdda45f, transparent: k < T - 1, opacity: k < T - 1 ? 0.75 : 1 }));
+      m.visible = false; m.frustumCulled = false; scene.add(m); trajMarkers.push(m);
+    }
+    var p0 = d.traj.coords[0], pT = d.traj.coords[T - 1];
+    labels3d.push({ sprite: makeSprite('prompt', new THREE.Vector3(p0[0], p0[1] + 0.05, p0[2]), '#b3aa9c', false, 21), isTraj: true });
+    labels3d.push({ sprite: makeSprite('generated', new THREE.Vector3(pT[0], pT[1] - 0.055, pT[2]), '#f2e7d5', false, 21), isTraj: true });
+    labels3d.forEach(function (o) { if (o.isTraj) o.sprite.visible = false; });
+
+    document.getElementById('trajPrompt').textContent = '"' + d.traj.prompt + '"';
+    var words = d.traj.text.trim().split(/\s+/);
+    document.getElementById('trajOut').innerHTML = words.map(function (w, i) {
+      return i < 4 ? '<span style="background:color-mix(in srgb, var(--accent) 20%, transparent);border-radius:2px">' + esc(w) + '</span>' : esc(w);
+    }).join(' ') + ' …';
+    document.getElementById('trajFoot').textContent = T + ' greedy steps · final layer, PCA frame';
+
+    bindInput();
+    animate();
+  }
+  function esc(s) { return s.replace(/[&<>"]/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); }
+
+  // Labels keep a constant apparent size: each frame their world scale is derived
+  // from the camera distance, so they stay readable at every zoom level.
+  function makeSprite(text, pos, color, outlined, sizePx) {
+    var px = sizePx || 22;
+    var cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+    var font = '500 44px "Instrument Sans", "DejaVu Sans", sans-serif';
+    ctx.font = font;
+    cv.width = Math.ceil(ctx.measureText(text).width) + 30; cv.height = 64;
+    ctx = cv.getContext('2d');
+    ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (outlined) { ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(23,20,16,0.92)'; ctx.strokeText(text, cv.width / 2, 33); }
+    ctx.fillStyle = color; ctx.fillText(text, cv.width / 2, 33);
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false, depthWrite: false }));
+    sp.userData = { px: px, aspect: cv.width / cv.height };
+    sp.position.copy(pos); sp.renderOrder = 10;
+    sp.userData.base = sp.position.clone();
+    scene.add(sp);
+    return sp;
+  }
+  var _up = new (window.THREE.Vector3)(), _right = new (window.THREE.Vector3)();
+  var _scr = new (window.THREE.Vector3)();
+
+  // Screen-space declutter: labels that would land on top of one another are
+  // nudged along the camera's own axes; ones that still collide are dimmed so the
+  // crowding is visible instead of hidden. Positions are always rebuilt from the
+  // cluster centroid, so nothing drifts over time.
+  function declutter() {
+    var boxes = [], offs = [[0, 0], [0, -1.15], [0, 1.15], [1.3, 0], [-1.3, 0], [0, -2.3], [0, 2.3]];
+    _up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    _right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    for (var i = 0; i < labels3d.length; i++) {
+      var o = labels3d[i], sp = o.sprite;
+      if (!o.topic || !sp.visible) continue;
+      var d = camera.position.distanceTo(sp.userData.base);
+      var w = sp.userData.aspect * sp.userData.px, h = sp.userData.px;
+      var scale = d / ((window.innerHeight / 2) / Math.tan(camera.fov * Math.PI / 360));
+      var spot = null;
+      for (var k = 0; k < offs.length; k++) {
+        var cx = offs[k][0] * w * scale, cy = offs[k][1] * h * scale;
+        sp.position.copy(sp.userData.base).addScaledVector(_right, cx).addScaledVector(_up, cy);
+        _scr.copy(sp.position).project(camera);
+        var sx = (_scr.x * 0.5 + 0.5) * window.innerWidth, sy = (-_scr.y * 0.5 + 0.5) * window.innerHeight;
+        var clash = false;
+        for (var b = 0; b < boxes.length; b++) {
+          if (Math.abs(sx - boxes[b][0]) < (w + boxes[b][2]) / 2 && Math.abs(sy - boxes[b][1]) < (h + boxes[b][3]) / 2) { clash = true; break; }
+        }
+        if (!clash || k === offs.length - 1) { spot = [sx, sy, clash]; break; }
+      }
+      if (spot) boxes.push([spot[0], spot[1], w, h]);
+      sp.material.opacity = (state.solo && o.topic !== state.solo ? 0.13 : 1) * (spot && spot[2] ? 0.42 : 1);
+    }
+  }
+  function scaleLabels() {
+    var tanH = Math.tan(camera.fov * Math.PI / 360);
+    var pxPerUnitAt1 = (window.innerHeight / 2) / tanH;
+    for (var i = 0; i < labels3d.length; i++) {
+      var sp = labels3d[i].sprite;
+      if (!sp.visible) continue;
+      var d = camera.position.distanceTo(sp.position);
+      var h = sp.userData.px * d / pxPerUnitAt1;
+      sp.scale.set(h * sp.userData.aspect, h, 1);
+    }
+  }
+
+  function refreshColors() {
+    var d = state.data, c = new THREE.Color(), al = points.geometry.attributes.aAlpha.array;
+    for (var i = 0; i < d.nSentences; i++) {
+      var t = d.sentences[i].y;
+      c.set(COLORS[t] || '#999999');
+      colAttr.array[i * 3] = c.r; colAttr.array[i * 3 + 1] = c.g; colAttr.array[i * 3 + 2] = c.b;
+      al[i] = (!state.solo || t === state.solo) ? 1 : 0.09;
+    }
+    colAttr.needsUpdate = true; points.geometry.attributes.aAlpha.needsUpdate = true;
+  }
+  function setSizes(hi) {
+    var a = sizeAttr.array;
+    for (var i = 0; i < a.length; i++) a[i] = i === hi ? 16 : 8.5;
+    sizeAttr.needsUpdate = true;
+  }
+  function resize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (points) points.material.uniforms.uPixel.value = h;
+  }
+  function bindInput() {
+    var el = renderer.domElement;
+    el.addEventListener('pointerdown', function (e) { dragging = true; lastP.x = e.clientX; lastP.y = e.clientY; try { el.setPointerCapture(e.pointerId); } catch (x) {} });
+    el.addEventListener('pointermove', function (e) {
+      pointer.x = e.clientX; pointer.y = e.clientY;
+      if (dragging) {
+        target.theta -= (e.clientX - lastP.x) * 0.006;
+        target.phi = Math.max(0.15, Math.min(Math.PI - 0.15, target.phi - (e.clientY - lastP.y) * 0.006));
+        lastP.x = e.clientX; lastP.y = e.clientY;
+      }
+    });
+    el.addEventListener('pointerup', function (e) { dragging = false; try { el.releasePointerCapture(e.pointerId); } catch (x) {} });
+    el.addEventListener('pointerleave', function () { dragging = false; pointer.x = -2; });
+    el.addEventListener('wheel', function (e) { e.preventDefault(); target.r = Math.max(1.2, Math.min(8, target.r * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
+  }
+  // What the hovered sentence sits next to in the layout on screen: computed from
+  // the same positions being drawn, so it describes the picture, not a side channel.
+  function neighbourLine(i) {
+    var a = posAttr.array, n = a.length / 3, d = state.data;
+    var x = a[i * 3], y = a[i * 3 + 1], z = a[i * 3 + 2], best = [];
+    for (var j = 0; j < n; j++) {
+      if (j === i) continue;
+      var dx = a[j * 3] - x, dy = a[j * 3 + 1] - y, dz = a[j * 3 + 2] - z;
+      best.push([dx * dx + dy * dy + dz * dz, j]);
+    }
+    best.sort(function (p, q) { return p[0] - q[0]; });
+    var same = 0;
+    for (var k = 0; k < 5; k++) if (d.sentences[best[k][1]].y === d.sentences[i].y) same++;
+    return same + ' of its 5 nearest neighbours share this domain';
+  }
+
+  function pickNearest() {
+    var a = posAttr.array, n = a.length / 3, W = window.innerWidth, H = window.innerHeight;
+    var best = -1, bestD = 15 * 15;
+    for (var i = 0; i < n; i++) {
+      _pick.set(a[i * 3], a[i * 3 + 1], a[i * 3 + 2]).project(camera);
+      if (_pick.z > 1) continue;
+      var dx = (_pick.x * 0.5 + 0.5) * W - pointer.x;
+      var dy = (-_pick.y * 0.5 + 0.5) * H - pointer.y;
+      var d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  function updateTip() {
+    var tip = document.getElementById('tip');
+    if (hovered < 0) { tip.classList.remove('on'); return; }
+    var d = state.data, s = d.sentences[hovered];
+    tip.innerHTML = '<div>' + esc(s.t) + '</div>' +
+      '<div class="y"><span class="dot" style="background:' + COLORS[s.y] + '"></span>' + s.y + '</div>' +
+      '<div class="dim">layer ' + state.layer + ' · ' + neighbourLine(hovered) + '</div>';
+    tip.classList.add('on');
+    tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 12, Math.max(12, pointer.x + 16)) + 'px';
+    tip.style.top = Math.min(window.innerHeight - tip.offsetHeight - 12, Math.max(12, pointer.y + 16)) + 'px';
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var dt = Math.min(0.05, clock.t ? (performance.now() - clock.t) / 1000 : 0.016);
+    clock.t = performance.now();
+    if (state.playing && state.t >= 1) {
+      state.dwell += dt;
+      if (state.dwell > 0.5) {
+        state.dwell = 0;
+        if (state.layer + 1 >= state.data.nLayers) setPlaying(false);
+        else selectLayer(state.layer + 1);
+      }
+    }
+    if (state.t < 1) {
+      state.t = Math.min(1, state.t + dt / state.dur);
+      var e = easeOut(state.t), a = posAttr.array, f = state.from, t2 = state.to;
+      for (var i = 0; i < a.length; i++) a[i] = f[i] + (t2[i] - f[i]) * e;
+      posAttr.needsUpdate = true;
+    }
+    if (!dragging && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) target.theta += dt * 0.05;
+    cur.theta += (target.theta - cur.theta) * 0.12;
+    cur.phi += (target.phi - cur.phi) * 0.12;
+    cur.r += (target.r - cur.r) * 0.12;
+    var sp = Math.sin(cur.phi), cp = Math.cos(cur.phi);
+    camera.position.set(cur.r * sp * Math.sin(cur.theta), cur.r * cp, cur.r * sp * Math.cos(cur.theta));
+    camera.lookAt(0, 0, 0);
+
+    if (pointer.x > -1) {
+      var idx = pickNearest();
+      if (idx !== hovered) { hovered = idx; setSizes(idx); }
+    }
+    updateTip();
+    scaleLabels();
+    declutter();
+    renderer.render(scene, camera);
+  }
+
+  function setPlaying(on) {
+    state.playing = on; state.dwell = 0;
+    var b = document.getElementById('play');
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.setAttribute('aria-label', on ? 'Pause' : 'Play through layers');
+    b.innerHTML = on
+      ? '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="3" y="2" width="3" height="10" fill="currentColor"/><rect x="8" y="2" width="3" height="10" fill="currentColor"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 2l9 5-9 5z" fill="currentColor"/></svg>';
+    if (on && state.layer >= state.data.nLayers - 1) selectLayer(0);
+  }
+  function setLayout(m) {
+    if (state.layout === m) return;
+    state.layout = m;
+    document.getElementById('lyPCA').setAttribute('aria-pressed', m === 'pca' ? 'true' : 'false');
+    document.getElementById('lyKNN').setAttribute('aria-pressed', m === 'layout' ? 'true' : 'false');
+    selectLayer(state.layer, true);
+  }
+  function setMode(m) {
+    state.mode = m;
+    document.getElementById('scUnit').setAttribute('aria-pressed', m === 'unit' ? 'true' : 'false');
+    document.getElementById('scRaw').setAttribute('aria-pressed', m === 'raw' ? 'true' : 'false');
+    selectLayer(state.layer, true);
+  }
+
+  document.getElementById('slider').addEventListener('input', function (e) { setPlaying(false); selectLayer(parseInt(e.target.value, 10)); });
+  document.getElementById('play').addEventListener('click', function () { setPlaying(!state.playing); });
+  document.getElementById('lyPCA').addEventListener('click', function () { setLayout('pca'); });
+  document.getElementById('lyKNN').addEventListener('click', function () { setLayout('layout'); });
+  document.getElementById('scUnit').addEventListener('click', function () { setMode('unit'); });
+  document.getElementById('scRaw').addEventListener('click', function () { setMode('raw'); });
+  document.getElementById('tgLabels').addEventListener('click', function () {
+    state.labels = !state.labels;
+    this.setAttribute('aria-pressed', state.labels ? 'true' : 'false');
+    labels3d.forEach(function (o) { if (!o.isTraj) o.sprite.visible = state.labels; });
+  });
+  document.getElementById('tgTraj').addEventListener('click', function () {
+    state.traj = !state.traj;
+    this.setAttribute('aria-pressed', state.traj ? 'true' : 'false');
+    document.getElementById('traj').classList.toggle('on', state.traj);
+    trajLine.visible = state.traj;
+    trajMarkers.forEach(function (m) { m.visible = state.traj; });
+    var d = state.data, T = d.traj.coords.length, p = trajLine.geometry.attributes.position;
+    for (var i = 0; i < T; i++) {
+      var c = d.traj.coords[i];
+      p.array[i * 3] = c[0]; p.array[i * 3 + 1] = c[1]; p.array[i * 3 + 2] = c[2];
+      trajMarkers[i].position.set(c[0], c[1], c[2]);
+    }
+    p.needsUpdate = true;
+    if (state.traj) { setLayout('pca'); selectLayer(d.nLayers - 1); }
+    else { labels3d.forEach(function (o) { if (o.isTraj) o.sprite.visible = false; }); }
+  });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight') { setPlaying(false); selectLayer(state.layer + 1); }
+    else if (e.key === 'ArrowLeft') { setPlaying(false); selectLayer(state.layer - 1); }
+    else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
+  });
+})();
+</script>
+</body>
+</html>

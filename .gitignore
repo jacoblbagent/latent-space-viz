@@ -1,0 +1,5 @@
+# regenerable: 18 MB of activations, rebuild with scripts/extract.py
+data/*.npz
+.venv/
+__pycache__/
+*.pyc
