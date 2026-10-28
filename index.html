@@ -33,11 +33,8 @@
 
   #head{padding:var(--s4)}
   #head h1{margin:0; font-size:25px; font-weight:600; letter-spacing:-.03em}
-  #head .model{margin:var(--s1) 0 var(--s3); font-size:13px; line-height:1.45; color:var(--ink-2)}
+  #head .model{margin:var(--s1) 0 0; font-size:13px; line-height:1.45; color:var(--ink-2)}
   #head .model b{font-weight:500; color:var(--ink)}
-  .facts{display:grid; grid-template-columns:auto 1fr; gap:2px var(--s4); margin:0; font-size:12px}
-  .facts dt{color:var(--ink-3)}
-  .facts dd{margin:0; font-family:var(--mono); font-variant-numeric:tabular-nums}
 
   #layerctl{padding:var(--s3) var(--s4) var(--s4)}
   .ctl-top{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:var(--s1)}
@@ -157,13 +154,6 @@
 <section class="pane" id="head">
   <h1>Latent Space</h1>
   <p class="model"><b id="modelName">—</b> hidden states, mean-pooled per sentence, drawn in 3D.</p>
-  <dl class="facts">
-    <dt>layers</dt><dd>0 → <span id="fLayers">—</span></dd>
-    <dt>hidden size</dt><dd id="fDim">—</dd>
-    <dt>sentences</dt><dd id="fSent">—</dd>
-    <dt>per domain</dt><dd id="fPer">—</dd>
-    <dt>domains</dt><dd id="fTopics">—</dd>
-  </dl>
 </section>
 
 <section class="pane" id="docs">
@@ -376,11 +366,6 @@
     state.data = d;
     document.getElementById('loading').style.display = 'none';
     document.getElementById('modelName').textContent = d.model;
-    document.getElementById('fLayers').textContent = String(d.nLayers - 1);
-    document.getElementById('fDim').textContent = d.hiddenSize;
-    document.getElementById('fSent').textContent = d.nSentences;
-    document.getElementById('fPer').textContent = Math.round(d.nSentences / d.topics.length);
-    document.getElementById('fTopics').textContent = d.topics.length;
     document.getElementById('slider').max = d.nLayers - 1;
     // the field guide quotes the same numbers the header does, taken from the data
     var docNums = { docLayers: d.nLayers - 1, docLast: d.nLayers - 1, docDim: d.hiddenSize,

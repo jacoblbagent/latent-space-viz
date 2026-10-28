@@ -64,7 +64,7 @@ how it is built, reading the numbers, limits) holding seven collapsible sections
 Each section states what the thing is and what it costs — a hidden state, the point
 colour, the layer slider's four regimes, PCA versus UMAP, the four readouts, the
 scale toggles and the generation path, and the four things the picture cannot tell
-you. It quotes the same counts as the header, read from `data/latent.json`, and
+you. It quotes the real counts, read from `data/latent.json`, and
 scrolls independently between the header and the controls. It hides below 620px of
 viewport height and under 1000px of width, where the canvas needs the room.
 
